@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Employee Late Fine Calculator</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  body { background: #f5f6f8; color: #1a1a1a; padding: 24px; line-height: 1.5; }
+  .container { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 24px; font-weight: 600; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
+  .card { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; border: 1px solid #e5e7eb; }
+  .card h2 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #111; }
+  .card h3 { font-size: 13px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+  .upload-zone { border: 2px dashed #d1d5db; border-radius: 8px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .upload-zone:hover { border-color: #3b82f6; background: #f0f7ff; }
+  .upload-zone input { display: none; }
+  .upload-zone.has-file { border-color: #10b981; background: #f0fdf4; }
+  .upload-label { font-size: 14px; color: #6b7280; }
+  .upload-label strong { color: #111; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .config-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .config-row label { font-size: 14px; font-weight: 500; min-width: 200px; color: #111; }
+  input[type=time], input[type=text] { padding: 6px 12px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 14px; font-family: inherit; background: white; }
+  input[type=time]:focus, input[type=text]:focus { outline: 2px solid #3b82f6; outline-offset: -1px; border-color: #3b82f6; }
+  .btn { padding: 9px 20px; background: #111; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; transition: background 0.15s; }
+  .btn:hover { background: #333; }
+  .btn:disabled { background: #9ca3af; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: #111; border: 1px solid #d1d5db; }
+  .btn-ghost:hover { background: #f3f4f6; }
+  .rules-box { background: #fef3c7; border-left: 3px solid #f59e0b; padding: 12px 16px; border-radius: 6px; font-size: 13px; color: #78350f; margin-bottom: 16px; line-height: 1.7; }
+  .rules-box strong { color: #451a03; }
+  .tier-table { width: 100%; font-size: 13px; margin-top: 6px; }
+  .tier-table td { padding: 3px 12px 3px 0; }
+  .overrides { max-height: 400px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+  .override-row { display: grid; grid-template-columns: 1.5fr 1fr 1fr 0.8fr; gap: 10px; padding: 8px 14px; border-bottom: 1px solid #f3f4f6; align-items: center; font-size: 13px; }
+  .override-row:last-child { border-bottom: none; }
+  .override-row:nth-child(odd) { background: #fafafa; }
+  .override-row.special { background: #fef3c7; }
+  .override-row .emp { font-weight: 500; }
+  .override-row input[type=time] { padding: 4px 8px; font-size: 12px; width: 100%; }
+  .override-row label { display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer; }
+  .override-header { display: grid; grid-template-columns: 1.5fr 1fr 1fr 0.8fr; gap: 10px; padding: 8px 14px; background: #f3f4f6; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #6b7280; letter-spacing: 0.05em; }
+  .results { margin-top: 16px; }
+  .week-block { margin-bottom: 20px; }
+  .week-header { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #111; padding-bottom: 8px; border-bottom: 2px solid #111; }
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  .stat { background: #f9fafb; padding: 12px 14px; border-radius: 8px; border: 1px solid #e5e7eb; }
+  .stat-label { font-size: 11px; color: #6b7280; text-transform: uppercase; font-weight: 500; }
+  .stat-value { font-size: 22px; font-weight: 600; margin-top: 2px; color: #111; }
+  table.results-table { width: 100%; border-collapse: collapse; font-size: 13px; background: white; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb; }
+  .results-table th { background: #f3f4f6; text-align: left; padding: 10px 12px; font-weight: 600; font-size: 11px; text-transform: uppercase; color: #374151; border-bottom: 1px solid #e5e7eb; }
+  .results-table td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+  .results-table tr:last-child td { border-bottom: none; }
+  .results-table tr.emp-row:hover { background: #fafafa; }
+  .results-table .emp-name { font-weight: 500; color: #111; }
+  .fine-pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .fine-0 { background: #d1fae5; color: #065f46; }
+  .fine-300 { background: #fed7aa; color: #9a3412; }
+  .fine-600 { background: #fecaca; color: #991b1b; }
+  .fine-1200 { background: #fca5a5; color: #7f1d1d; }
+  .fine-2000 { background: #dc2626; color: white; }
+  .detail-toggle { cursor: pointer; color: #3b82f6; font-size: 12px; text-decoration: underline; }
+  .detail-row td { background: #fafafa; padding: 0 !important; }
+  .detail-inner { padding: 10px 14px; }
+  .day-list { display: grid; grid-template-columns: 1fr; gap: 4px; font-size: 12px; }
+  .day-item { display: grid; grid-template-columns: 90px 90px 80px 1fr; gap: 10px; padding: 4px 0; }
+  .day-item.buffered { color: #6b7280; text-decoration: line-through; text-decoration-color: #d1d5db; }
+  .day-item.buffered .tag { text-decoration: none; }
+  .tag { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #fef3c7; color: #78350f; font-weight: 500; }
+  .empty-state { text-align: center; color: #9ca3af; padding: 30px; font-size: 14px; }
+  .error-msg { background: #fee2e2; color: #991b1b; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; }
+  .footer-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+  @media (max-width: 768px) {
+    body { padding: 12px; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .override-row, .override-header { grid-template-columns: 1fr; gap: 4px; }
+    .config-row label { min-width: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Employee Late Fine Calculator</h1>
+  <div class="subtitle">Upload weekly swipe reports and auto-calculate per-employee fines based on the defined rules.</div>
+
+  <div class="rules-box">
+    <strong>Fine Rules (per week, total late minutes):</strong>
+    <table class="tier-table">
+      <tr><td>0 – 45 mins</td><td>→ ₹0 (no fine)</td></tr>
+      <tr><td>45.01 – 90 mins</td><td>→ ₹300</td></tr>
+      <tr><td>90.01 – 120 mins</td><td>→ ₹600</td></tr>
+      <tr><td>120.01 – 150 mins</td><td>→ ₹1,200</td></tr>
+      <tr><td>150.01+ mins</td><td>→ ₹2,000</td></tr>
+    </table>
+    <div style="margin-top:8px"><strong>Buffer:</strong> 1 day per week up to 11:00 AM is excluded from fine calc (auto-picks worst day that qualifies). Start time is 9:30 AM by default. Arrivals exceeding the buffer time do not get the buffer — those late minutes count fully.</div>
+  </div>
+
+  <div class="card">
+    <h2>1. Upload swipe files</h2>
+    <div class="grid-2">
+      <label class="upload-zone" id="zone1">
+        <input type="file" id="file1" accept=".xlsx">
+        <div class="upload-label" id="label1"><strong>Week 1</strong><br>Click to upload .xlsx</div>
+      </label>
+      <label class="upload-zone" id="zone2">
+        <input type="file" id="file2" accept=".xlsx">
+        <div class="upload-label" id="label2"><strong>Week 2</strong> (optional)<br>Click to upload .xlsx</div>
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. Configuration</h2>
+    <div class="config-row">
+      <label>Default start time</label>
+      <input type="time" id="defaultStart" value="09:30">
+      <span style="font-size:12px;color:#6b7280">(applies unless overridden below)</span>
+    </div>
+    <div class="config-row">
+      <label>Default buffer-day cutoff</label>
+      <input type="time" id="defaultBuffer" value="11:00">
+      <span style="font-size:12px;color:#6b7280">(arrivals up to this time on the 1 buffer day = no fine)</span>
+    </div>
+
+    <h3 style="margin-top:16px">Per-employee overrides</h3>
+    <div style="font-size:12px;color:#6b7280;margin-bottom:8px">Highlighted rows = special exceptions. Check "No buffer" to deny the 1-day buffer for an employee.</div>
+    <div class="overrides">
+      <div class="override-header">
+        <div>Employee</div>
+        <div>Start time</div>
+        <div>Buffer cutoff</div>
+        <div>No buffer</div>
+      </div>
+      <div id="overrideList"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3. Calculate</h2>
+    <button class="btn" id="calcBtn" onclick="calculate()">Calculate fines →</button>
+    <button class="btn btn-ghost" onclick="downloadTemplate()" style="margin-left:8px">Download sample structure</button>
+  </div>
+
+  <div id="results" class="results"></div>
+</div>
+
+<script>
+// === EMPLOYEE ROSTER & SPECIAL RULES ===
+const ROSTER = ['Akshat Arora','Aryaman Tandon','Jyoti Aggarwal','Manoj Tudu','R Promoth Kumar','Rajesh Kumar','Ravi Kamble','Saurabh Brahmbhatt','Shakambhar Pujari','Sharad Jawla','Shrawan Kumar Lal','Shrey Mishra','Sourabh Kumar Singh','Vaibhav','Vishwajeet Verma','Vivek Soni'];
+
+// Exceptions defined in requirements:
+// - Akshat Arora: start time is 11:30 AM
+// - R Promoth Kumar: 1-day buffer only till 10:15 AM
+const SPECIAL = {
+  'Akshat Arora':       { start: '11:30', bufferTime: null,    noBuffer: false, special: true },
+  'R Promoth Kumar':    { start: null,    bufferTime: '10:15', noBuffer: false, special: true }
+};
+
+let fileData = { 1: null, 2: null };
+let employeeOverrides = {};
+
+// === FINE TIERS ===
+// Strict: 0-45 = 0; >45 and <=90 = 300; >90 and <=120 = 600; >120 and <=150 = 1200; >150 = 2000
+function calculateFine(totalMins) {
+  if (totalMins <= 45) return 0;
+  if (totalMins <= 90) return 300;
+  if (totalMins <= 120) return 600;
+  if (totalMins <= 150) return 1200;
+  return 2000;
+}
+
+function fineClass(fine) {
+  if (fine === 0) return 'fine-0';
+  if (fine === 300) return 'fine-300';
+  if (fine === 600) return 'fine-600';
+  if (fine === 1200) return 'fine-1200';
+  return 'fine-2000';
+}
+
+// === TIME HELPERS ===
+function parseTimeStr(t) { const [h,m] = t.split(':').map(Number); return h*60 + m; }
+
+function parseSwipeDate(str) {
+  // Format: "17 Apr 2026 09:30:15"
+  const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+  const m = str.match(/(\d+)\s+(\w+)\s+(\d+)\s+(\d+):(\d+):(\d+)/);
+  if (!m) return null;
+  return new Date(+m[3], months[m[2]], +m[1], +m[4], +m[5], +m[6]);
+}
+
+// Minutes past start-time for this employee on this day (0 if on-time or early)
+// Seconds matter per rule #2: 150m 3s > 150m, crosses tier
+function minutesLate(arrivalDate, startTimeStr) {
+  const startMins = parseTimeStr(startTimeStr);
+  const arriveMins = arrivalDate.getHours()*60 + arrivalDate.getMinutes() + arrivalDate.getSeconds()/60;
+  return Math.max(0, arriveMins - startMins);
+}
+
+// === OVERRIDE UI ===
+function renderOverrides() {
+  const el = document.getElementById('overrideList');
+  el.innerHTML = '';
+  ROSTER.forEach(emp => {
+    if (!employeeOverrides[emp]) {
+      employeeOverrides[emp] = SPECIAL[emp] ? {...SPECIAL[emp]} : { start: null, bufferTime: null, noBuffer: false, special: false };
+    }
+    const ov = employeeOverrides[emp];
+    const defaultStart = document.getElementById('defaultStart').value;
+    const defaultBuf = document.getElementById('defaultBuffer').value;
+    const row = document.createElement('div');
+    row.className = 'override-row' + (ov.special ? ' special' : '');
+    row.innerHTML = `
+      <div class="emp">${emp}${ov.special ? ' ★' : ''}</div>
+      <input type="time" value="${ov.start || defaultStart}" onchange="setOverride('${emp.replace(/'/g,"\\'")}','start',this.value)">
+      <input type="time" value="${ov.bufferTime || defaultBuf}" onchange="setOverride('${emp.replace(/'/g,"\\'")}','bufferTime',this.value)" ${ov.noBuffer ? 'disabled' : ''}>
+      <label><input type="checkbox" ${ov.noBuffer ? 'checked' : ''} onchange="setOverride('${emp.replace(/'/g,"\\'")}','noBuffer',this.checked)"> Deny</label>
+    `;
+    el.appendChild(row);
+  });
+}
+
+function setOverride(emp, field, value) {
+  if (!employeeOverrides[emp]) employeeOverrides[emp] = {};
+  employeeOverrides[emp][field] = value;
+  if (field === 'noBuffer') renderOverrides();
+}
+
+// === FILE UPLOAD ===
+function setupUpload(n) {
+  const input = document.getElementById('file'+n);
+  const zone  = document.getElementById('zone'+n);
+  const label = document.getElementById('label'+n);
+  input.addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet);
+        fileData[n] = { name: f.name, rows };
+        label.innerHTML = `<strong>✓ ${f.name}</strong><br>${rows.length} swipe records loaded`;
+        zone.classList.add('has-file');
+      } catch (err) {
+        label.innerHTML = `<strong>✗ Error reading file</strong><br>${err.message}`;
+      }
+    };
+    reader.readAsArrayBuffer(f);
+  });
+}
+setupUpload(1); setupUpload(2);
+
+// === CORE CALCULATION ===
+function processWeek(fileObj) {
+  const rows = fileObj.rows;
+  // Only "In" swipes; earliest per (employee, date)
+  const byEmpDay = {};
+  rows.forEach(r => {
+    if (r['In/Out'] !== 'In') return;
+    const dt = parseSwipeDate(r['Swipe Date']);
+    if (!dt) return;
+    const emp = r['Employee Name'];
+    const dateKey = dt.toISOString().slice(0,10);
+    const k = emp + '|' + dateKey;
+    if (!byEmpDay[k] || dt < byEmpDay[k].dt) {
+      byEmpDay[k] = { emp, date: dateKey, dt };
+    }
+  });
+
+  // Group per employee
+  const perEmp = {};
+  Object.values(byEmpDay).forEach(r => {
+    if (!perEmp[r.emp]) perEmp[r.emp] = [];
+    perEmp[r.emp].push(r);
+  });
+
+  // Compute late minutes per day, apply buffer, total
+  const defaultStart = document.getElementById('defaultStart').value;
+  const defaultBuffer = document.getElementById('defaultBuffer').value;
+
+  const result = [];
+  Object.keys(perEmp).sort().forEach(emp => {
+    const ov = employeeOverrides[emp] || {};
+    const startTime = ov.start || defaultStart;
+    const bufferTime = ov.bufferTime || defaultBuffer;
+    const noBuffer = !!ov.noBuffer;
+
+    const startMins = parseTimeStr(startTime);
+    const bufferMins = parseTimeStr(bufferTime);
+    // Max minutes the buffer can forgive on any single day = buffer cutoff - start time
+    const maxBufferForgiveness = Math.max(0, bufferMins - startMins);
+
+    const days = perEmp[emp].map(r => {
+      const late = minutesLate(r.dt, startTime);
+      // Forgiveness if buffer were applied to this day:
+      //   - If arrived ON/BEFORE buffer cutoff -> full late mins are forgiven
+      //   - If arrived AFTER buffer cutoff -> only the max buffer window is forgiven,
+      //     remaining mins past buffer cutoff still count
+      const arriveMins = r.dt.getHours()*60 + r.dt.getMinutes() + r.dt.getSeconds()/60;
+      const arrivedByCutoff = arriveMins <= bufferMins + 1/60000;
+      const bufferSavings = noBuffer ? 0 : (arrivedByCutoff ? late : maxBufferForgiveness);
+      return { date: r.date, dt: r.dt, late, arrivedByCutoff, bufferSavings, buffered: false };
+    }).sort((a,b) => a.date.localeCompare(b.date));
+
+    // Auto-pick the day where buffer saves the most minutes
+    if (!noBuffer) {
+      const candidates = days.filter(d => d.bufferSavings > 0);
+      if (candidates.length) {
+        let best = candidates[0];
+        candidates.forEach(d => { if (d.bufferSavings > best.bufferSavings) best = d; });
+        best.buffered = true;
+      }
+    }
+
+    // Total late mins after buffer removal
+    const totalLate = days.reduce((s,d) => s + (d.buffered ? (d.late - d.bufferSavings) : d.late), 0);
+    const fine = calculateFine(totalLate);
+
+    result.push({
+      emp, startTime, bufferTime, noBuffer,
+      days, totalLate: Math.round(totalLate*100)/100, fine,
+      special: SPECIAL[emp] ? true : false
+    });
+  });
+
+  // Only show employees who had at least one late day (totalLate > 0 OR buffered late day)
+  return result.filter(r => r.days.some(d => d.late > 0));
+}
+
+function calculate() {
+  if (!fileData[1] && !fileData[2]) {
+    alert('Please upload at least one swipe file.');
+    return;
+  }
+  const resultsEl = document.getElementById('results');
+  resultsEl.innerHTML = '';
+
+  [1,2].forEach(n => {
+    if (!fileData[n]) return;
+    const weekResults = processWeek(fileData[n]);
+    if (!weekResults.length) {
+      resultsEl.innerHTML += `<div class="card"><div class="empty-state">No late arrivals in ${fileData[n].name}</div></div>`;
+      return;
+    }
+    renderWeek(n, fileData[n].name, weekResults);
+  });
+}
+
+function renderWeek(n, fileName, results) {
+  const totalFine = results.reduce((s,r) => s + r.fine, 0);
+  const finedCount = results.filter(r => r.fine > 0).length;
+  const totalLateMins = Math.round(results.reduce((s,r) => s + r.totalLate, 0));
+
+  const html = `
+    <div class="card week-block">
+      <div class="week-header">Week ${n} — ${fileName}</div>
+      <div class="stats-row">
+        <div class="stat"><div class="stat-label">Employees late</div><div class="stat-value">${results.length}</div></div>
+        <div class="stat"><div class="stat-label">Employees fined</div><div class="stat-value">${finedCount}</div></div>
+        <div class="stat"><div class="stat-label">Total late mins (net)</div><div class="stat-value">${totalLateMins}</div></div>
+        <div class="stat"><div class="stat-label">Total fine</div><div class="stat-value">₹${totalFine.toLocaleString('en-IN')}</div></div>
+      </div>
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Rules</th>
+            <th>Days late</th>
+            <th>Late mins<br>(before buffer)</th>
+            <th>Late mins<br>(after buffer)</th>
+            <th>Fine</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${results.map((r,i) => {
+            const rawTotal = Math.round(r.days.reduce((s,d) => s + d.late, 0));
+            const buffered = r.days.find(d => d.buffered);
+            const daysLate = r.days.filter(d => d.late > 0).length;
+            const savedMins = buffered ? Math.round(buffered.bufferSavings) : 0;
+            return `
+              <tr class="emp-row">
+                <td class="emp-name">${r.emp}${r.special ? ' ★' : ''}</td>
+                <td style="font-size:11px;color:#6b7280">Start ${r.startTime}${r.noBuffer ? ' • No buffer' : ' • Buf&le;'+r.bufferTime}</td>
+                <td>${daysLate}</td>
+                <td>${rawTotal}</td>
+                <td><strong>${Math.round(r.totalLate)}</strong>${buffered ? ' <span class="tag">&minus;'+savedMins+' buffered</span>' : ''}</td>
+                <td><span class="fine-pill ${fineClass(r.fine)}">&#8377;${r.fine.toLocaleString('en-IN')}</span></td>
+                <td><span class="detail-toggle" onclick="toggleDetails(${n},${i})">show</span></td>
+              </tr>
+              <tr class="detail-row" id="d-${n}-${i}" style="display:none">
+                <td colspan="7">
+                  <div class="detail-inner">
+                    <div style="font-size:11px;font-weight:600;color:#6b7280;margin-bottom:6px;text-transform:uppercase">Day-by-day</div>
+                    <div class="day-list">
+                      ${r.days.map(d => {
+                        const arriveTime = d.dt.toTimeString().slice(0,8);
+                        const netAfterBuffer = d.buffered ? Math.round(d.late - d.bufferSavings) : Math.round(d.late);
+                        let statusHtml = '';
+                        let rowClass = '';
+                        if (d.buffered && d.arrivedByCutoff) {
+                          // Full day forgiven
+                          rowClass = 'buffered';
+                          statusHtml = '<span class="tag">BUFFER APPLIED (&minus;' + Math.round(d.bufferSavings) + ' mins)</span>';
+                        } else if (d.buffered && !d.arrivedByCutoff) {
+                          // Partial forgiveness: buffer absorbed max window, remainder still counts
+                          statusHtml = '<span class="tag">BUFFER APPLIED (&minus;' + Math.round(d.bufferSavings) + ' mins, ' + netAfterBuffer + ' mins still count)</span>';
+                        } else if (d.late === 0) {
+                          statusHtml = '<span style="color:#10b981">on time</span>';
+                        } else {
+                          statusHtml = '';
+                        }
+                        return `<div class="day-item ${rowClass}">
+                          <span>${d.date}</span>
+                          <span>${arriveTime}</span>
+                          <span>${Math.round(d.late)} mins</span>
+                          <span>${statusHtml}</span>
+                        </div>`;
+                      }).join('')}
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+      <div class="footer-actions">
+        <button class="btn btn-ghost" onclick="exportCSV(${n})">Export CSV</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('results').innerHTML += html;
+  window['__week_' + n] = results;
+}
+
+function toggleDetails(n, i) {
+  const el = document.getElementById(`d-${n}-${i}`);
+  el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
+}
+
+function exportCSV(n) {
+  const results = window['__week_' + n];
+  if (!results) return;
+  let csv = 'Employee,Start Time,Buffer Cutoff,Days Late,Raw Late Mins,Buffered Day,Mins Forgiven,Net Late Mins,Fine\n';
+  results.forEach(r => {
+    const rawTotal = Math.round(r.days.reduce((s,d) => s + d.late, 0));
+    const buffered = r.days.find(d => d.buffered);
+    const daysLate = r.days.filter(d => d.late > 0).length;
+    csv += `"${r.emp}",${r.startTime},${r.noBuffer ? 'NONE' : r.bufferTime},${daysLate},${rawTotal},${buffered ? buffered.date : ''},${buffered ? Math.round(buffered.bufferSavings) : 0},${Math.round(r.totalLate)},${r.fine}\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `fine_report_week${n}.csv`;
+  a.click();
+}
+
+function downloadTemplate() {
+  alert('Expected Excel columns: Employee No, Employee Name, Swipe Date (format: "17 Apr 2026 09:30:15"), In/Out. Use exports from your attendance system directly.');
+}
+
+// Initialize
+document.getElementById('defaultStart').addEventListener('change', renderOverrides);
+document.getElementById('defaultBuffer').addEventListener('change', renderOverrides);
+renderOverrides();
+</script>
+</body>
+</html>
